@@ -1,0 +1,26 @@
+{
+  "tool": "tools/sglang-ladder.py (github.com/05yuki/KTransformers), llama-split-bench 7af72d4 protocol",
+  "stages": [
+    0,
+    32000,
+    64000,
+    126000
+  ],
+  "n_predict": 1000,
+  "sampling": "greedy, ignore_eos",
+  "pp0_prompts": [
+    512,
+    2048,
+    8192
+  ],
+  "filler": "llama-split-bench fill_text + TAIL (English)",
+  "concurrency": 1,
+  "date": "2026-09-28/29",
+  "notes": [
+    "ラダーは構成 A（普段の設定）のみです",
+    "ラダーの計測（2026-09-28）の時点では、本体の FP8 版からルーティングされるエキスパートを除いた 16.6 GB の版を読み込んでいます（エキスパートは CPU 側・GPU prefill とも NVFP4 版から読むため、計算に使う重みは参考の計測と同じです）",
+    "このモデルの sglang（GLM 用の古い版）では前の段の文脈が再利用されず、各段で文脈全体を先頭から prefill しています。そのため prefill の値は、その深さまでを埋める平均の速度です",
+    "最後の段は、context 長（131,072）に 1000 トークンの生成が収まるよう 126,000 を指定し、GLM のトークナイザでは 121,093 トークンになりました",
+    "この版の sglang はサーバ側で prefill の時刻を記録しないため、prefill は最初のトークンが返るまでの時間、decode はサーバが返す全体の所要時間から prefill の時間を引いたものから計算しています"
+  ]
+}
