@@ -44,6 +44,7 @@ Claude Code、Codex、OpenCodeなどのコーディングエージェントを�
 
 | 日付 | タイトル | 作成者 | コンピュータ / マザーボード | GPU | ベンチ |
 |------|----------|--------|-----------------------------|-----|--------|
+| 2026-09-27 | [RTX 5090 1 枚で Qwen3.8 27B UD-Q5_K_XL を 262k コンテキストまで計測](report/2026-09-27_060846_profiling_qwen3.8_27b_ud_q5_k_xl_up_to_262k_context_on_rtx5090.md) | unco3 | ASRock Z790 Steel Legend WiFi | RTX 5090 × 1 | Qwen3.8 27B UD-Q5_K_XL |
 | 2026-09-26 | [RTX 5090 で Qwen3.8 27B を 262k コンテキストで測定](report/2026-09-26_203225_measuring_qwen3_8_27b_at_262k_context_on_rtx_5090.md) | completenovice-eng | Micro-Star International Co., Ltd. PRO B650-S (MS-7E26) | RTX 5090 × 1 | Huihui-Qwen3.8-27B-abliterated-Q4_K |
 | 2026-09-26 | [EVO-X2 128GBでQwen3.8-Flash-NextをHalogenで実行](report/2026-09-26_171511_running_qwen3.8_flash_next_with_halogen_on_evo_x2_128gb.md) | A-Uta | GMKtec NucBox EVO-X2 | Radeon 8060S × 1 | Qwen3.8 Flash Next W4B（Halogen） |
 | 2026-09-26 | [Tesla T4 4 枚で Qwen3.8 27B の split-mode と量子化を比較](report/2026-09-26_084514_comparing_split_modes_and_quantizations_of_qwen3.8_27b_on_4x_tesla_t4.md) | MG8853 | HPE ProLiant DL380 Gen10 | Tesla T4 × 4 | Qwen3.8 27B UD-Q4_K_XL / UD-Q6_K / Q8_0 |
