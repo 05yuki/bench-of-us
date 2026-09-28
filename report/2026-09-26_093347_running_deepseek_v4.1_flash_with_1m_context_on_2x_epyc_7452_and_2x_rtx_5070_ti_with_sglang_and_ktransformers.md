@@ -36,7 +36,7 @@ llama.cpp ではなく sglang＋KTransformers で動かしているため、llam
 
 | 項目 | 内容 |
 |------|------|
-| ツール | 自作スクリプト [`tools/sglang-ladder.py`](https://github.com/05yuki/KTransformers/blob/main/tools/sglang-ladder.py)（llama-split-bench 7af72d4 の `measure_ladder.py` / `measure_pp0.py` と同じ手順を、sglang の `/generate` に移植したもの）。llama-split-bench は llama.cpp 専用のため使っていません |
+| ツール | 自作スクリプト [`sglang-ladder.py`](attachment/2026-09-26_093347_running_deepseek_v4.1_flash_with_1m_context_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/sglang-ladder.py)（llama-split-bench 7af72d4 の `measure_ladder.py` / `measure_pp0.py` と同じ手順を、sglang の `/generate` に移植したもの）。llama-split-bench は llama.cpp 専用のため使っていません |
 | モデル | [deepseek-ai/DeepSeek-V4.1-Flash](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash)（公式の重み）。本体は FP8（32×32 ブロック）、エキスパートは FP4。engram テーブル込みで 476 GB。40 層、ルーティングされるエキスパート 384 個中 6 個がアクティブ |
 | 測定モード | CPU/GPU 分担（TP=2）。GPU に置くもの: エキスパート以外のすべてと、各層で使用頻度の高いエキスパート 5 個（Marlin カーネル）。prefill: エキスパートを層ごとに GPU へ転送して計算（ホスト側の領域は起動時にピン留めし、ゼロコピーで転送）。engram: NVMe から直接読み出し |
 | ctx / stages | 1M / 0,32000,64000,128000 |
@@ -90,7 +90,7 @@ decode（t/s、2 回の範囲）:
 
 ### 所感
 
-- 深度ラダーでは、最も深い段（129k）まで decode は 22.9〜23.5 t/s、prefill は 185〜249 t/s で、深さによる低下はほとんどありませんでした。
+- 深度ラダーでは、最も深い段（128k）まで decode は 22.9〜23.5 t/s、prefill は段によって 185〜249 t/s とばらつきましたが、深くなるほど遅くなる傾向はありませんでした。
 - decode は CPU のメモリ帯域どおりの値でした。EPYC 7452 はソケットあたり CCD が 4 つで、メモリ帯域の上限は DIMM ではなく CCD の数で決まっていました。
 - 長い prefill を続けて実行すると徐々に遅くなる現象があり、原因は熱でした。吸気温度が 47℃ を超えると CPU1 側のメモリ帯域が半分ほどに絞られます。CPU1 ソケットの直上にファンを追加して冷やし、安定させています。
 - コンテキスト長 1M を確保できるので、長い思考を伴う用途や、複数の文脈を並行して扱う用途はこのモデルに寄せています。
@@ -116,4 +116,5 @@ decode（t/s、2 回の範囲）:
 - [split-bench-en.png](attachment/2026-09-26_093347_running_deepseek_v4.1_flash_with_1m_context_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/split-bench-en.png)
 - [results-ladder.json](attachment/2026-09-26_093347_running_deepseek_v4.1_flash_with_1m_context_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/results-ladder.json) / [results-ladder-pp0.json](attachment/2026-09-26_093347_running_deepseek_v4.1_flash_with_1m_context_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/results-ladder-pp0.json)
 - [run-info.json](attachment/2026-09-26_093347_running_deepseek_v4.1_flash_with_1m_context_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/run-info.json)
+- [sglang-ladder.py](attachment/2026-09-26_093347_running_deepseek_v4.1_flash_with_1m_context_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/sglang-ladder.py)（計測スクリプト）
 - [results.json](attachment/2026-09-26_093347_running_deepseek_v4.1_flash_with_1m_context_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/results.json)（参考の実プロンプトの計測）
