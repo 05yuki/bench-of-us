@@ -1,23 +1,26 @@
 {
-  "tool": "tools/sglang-ladder.py (github.com/05yuki/KTransformers), llama-split-bench 7af72d4 protocol",
-  "stages": [
-    0,
-    32000,
-    64000,
-    128000
-  ],
+  "machine": "HUANANZHI H12D-16D + RTX 5070 Ti x2",
+  "date": "2026-09-28",
+  "ctx": 262144,
+  "stages": "0,32000,64000,128000",
   "n_predict": 1000,
+  "cache_k": "bf16",
+  "cache_v": "bf16",
+  "engine": "sglang + KTransformers (kt-kernel AVX2)",
+  "modes": [
+    {
+      "name": "hot48",
+      "device": "TP2, 48 hot experts/layer on GPU"
+    }
+  ],
+  "tool": "sglang-ladder.py (llama-split-bench 7af72d4 protocol ported to sglang)",
   "sampling": "greedy, ignore_eos",
   "pp0_prompts": [
     512,
     2048,
     8192
   ],
-  "filler": "llama-split-bench fill_text + TAIL (English)",
+  "filler": "llama-split-bench fill_text + TAIL",
   "concurrency": 1,
-  "date": "2026-09-28/29",
-  "notes": [
-    "時間は sglang のサーバ側の記録（prefill の開始・終了時刻、decode のスループット）から計算しています",
-    "ラダーの計測時だけプレフィックスキャッシュを有効にしています（普段の設定は無効）。このモデルは Mamba 系の層の状態を chunk（2048 トークン）の境目でしか保存しないため、前の段の文脈の再利用は 2048 トークン単位で切り捨てられます"
-  ]
+  "notes": []
 }
