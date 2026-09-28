@@ -1,0 +1,22 @@
+{
+  "tool": "tools/sglang-ladder.py (github.com/05yuki/KTransformers), llama-split-bench 7af72d4 protocol",
+  "stages": [
+    0,
+    32000,
+    64000,
+    128000
+  ],
+  "n_predict": 1000,
+  "sampling": "greedy, ignore_eos",
+  "pp0_prompts": [
+    512,
+    2048,
+    8192
+  ],
+  "filler": "llama-split-bench fill_text + TAIL (English)",
+  "concurrency": 1,
+  "date": "2026-09-28/29",
+  "notes": [
+    "時間は sglang のサーバ側の記録（prefill の開始・終了時刻、decode のスループット）から計算しています"
+  ]
+}
