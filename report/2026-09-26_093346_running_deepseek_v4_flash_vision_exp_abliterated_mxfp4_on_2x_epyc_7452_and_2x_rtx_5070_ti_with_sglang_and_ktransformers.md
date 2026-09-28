@@ -38,9 +38,9 @@ llama.cpp ではなく sglang＋KTransformers で動かしているため、llam
 |------|------|
 | ツール | 自作スクリプト [`sglang-ladder.py`](attachment/2026-09-26_093346_running_deepseek_v4_flash_vision_exp_abliterated_mxfp4_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/sglang-ladder.py)（llama-split-bench 7af72d4 の `measure_ladder.py` / `measure_pp0.py` と同じ手順を、sglang の `/generate` に移植したもの）。llama-split-bench は llama.cpp 専用のため使っていません |
 | モデル | DeepSeek V4-Flash-Vision-Exp の abliterated 版。[huihui-ai/Huihui-DeepSeek-V4-Flash-Vision-Exp-abliterated-GGUF](https://huggingface.co/huihui-ai/Huihui-DeepSeek-V4-Flash-Vision-Exp-abliterated-GGUF) を sglang で読める形式に自前で変換。エキスパートは GGUF の MXFP4 をそのまま使用、エキスパート以外の重みは FP8。147 GB。43 層、ルーティングされるエキスパート 256 個中 6 個がアクティブ |
-| 測定モード | CPU/GPU 分担（TP=2）。GPU に置くもの: エキスパート以外のすべてと、各層で使用頻度の高いエキスパート 10 個。prefill: 一定以上の長さでは、エキスパートを層ごとに GPU へ転送して計算。同時に CPU がエキスパート 3 グループ分を並行して計算 |
+| 測定モード | `hot10`：CPU/GPU 分担（TP=2）。GPU に置くもの: エキスパート以外のすべてと、各層で使用頻度の高いエキスパート 10 個。prefill: 一定以上の長さでは、エキスパートを層ごとに GPU へ転送して計算。同時に CPU がエキスパート 3 グループ分を並行して計算 |
 | ctx / stages | 1M（KV キャッシュの確保は 262K トークン） / 0,32000,64000,128000 |
-| KV キャッシュ | FP8（e4m3） |
+| KV キャッシュ | fp8_e4m3 / fp8_e4m3 |
 | 投機的デコード | なし |
 | その他 | ラダーは llama-split-bench と同じ英語の合成テキストを使い、各段で前の段の文脈の続きを送ります（前の段までの KV はプレフィックスキャッシュで再利用し、増えた分だけを prefill）。各段の直後に greedy・`ignore_eos` で 1000 トークン生成。depth 0 の prefill は新規プロンプト（512 / 2048 / 8192 トークン、先頭に毎回異なる文字列を付けてキャッシュを無効化）で、表と図の depth 0 は 2048 トークンの値です。同時リクエスト 1、測定日 2026-09-28〜29。参考の実プロンプトの計測: prefill は実際に使っている日本語の執筆指示（約 38K トークン）とその先頭 11,000 文字（約 6K トークン）を max_tokens 1 で送信し、2 回目の値（1 回目は起動直後のウォームアップを含む）。プロンプトの先頭に毎回異なる文字列を付けてプレフィックスキャッシュを無効化。decode は `ignore_eos`・思考なしで 2 回。temperature 1.0 / top_p 0.95、同時リクエスト 1。測定日 2026-09-26 |
 
@@ -50,16 +50,18 @@ llama.cpp ではなく sglang＋KTransformers で動かしているため、llam
 
 図は llama-split-bench の `plot_bench.py` で描いています（見出しの 2 行目に llama.cpp の版の代わりに推論エンジン名を出すよう 1 行だけ変更）。depth ごとの prefill / decode（t/s）。depth 0 の prefill は新規プロンプト（2048 トークン）の値です。decode はラダーの合成テキストでの実測値です。
 
-| depth | 実際の深さ（トークン） | prefill | decode |
-|------:|------:|------:|------:|
-| 0 | 0 | 575 | 32.8 |
-| 29k | 29,183 | 561 | 32.4 |
-| 64k | 64,926 | 569 | 31.8 |
-| 128k | 128,761 | 560 | 31.6 |
+| depth | prefill (t/s) | decode (t/s) |
+|------:|------:|------:|
+| 0 | 575 | 32.8 |
+| 29k | 561 | 32.4 |
+| 64k | 569 | 31.8 |
+| 128k | 560 | 31.6 |
+
+実際の深さ（トークン）: 29,183 / 64,926 / 128,761。ラダー初段（11 トークン）の prefill は計測上の artifact のため載せていません。
 
 depth 0 の新規プロンプト prefill（t/s）:
 
-| プロンプト長（トークン） | prefill |
+| プロンプト長 | hot10 (t/s) |
 |------:|------:|
 | 491 | 130 |
 | 1,886 | 575 |
@@ -112,8 +114,9 @@ decode（t/s、2 回の範囲）:
 
 ## 添付
 
-- [split-bench-en.png](attachment/2026-09-26_093346_running_deepseek_v4_flash_vision_exp_abliterated_mxfp4_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/split-bench-en.png)
-- [results-ladder.json](attachment/2026-09-26_093346_running_deepseek_v4_flash_vision_exp_abliterated_mxfp4_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/results-ladder.json) / [results-ladder-pp0.json](attachment/2026-09-26_093346_running_deepseek_v4_flash_vision_exp_abliterated_mxfp4_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/results-ladder-pp0.json)
 - [run-info.json](attachment/2026-09-26_093346_running_deepseek_v4_flash_vision_exp_abliterated_mxfp4_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/run-info.json)
+- [argv-hot10.txt](attachment/2026-09-26_093346_running_deepseek_v4_flash_vision_exp_abliterated_mxfp4_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/argv-hot10.txt)（sglang のサーバ設定。ホームディレクトリのパスは `~` に置き換え）
+- [results-hot10.json](attachment/2026-09-26_093346_running_deepseek_v4_flash_vision_exp_abliterated_mxfp4_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/results-hot10.json) / [results-hot10-pp0.json](attachment/2026-09-26_093346_running_deepseek_v4_flash_vision_exp_abliterated_mxfp4_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/results-hot10-pp0.json)
+- [split-bench-en.png](attachment/2026-09-26_093346_running_deepseek_v4_flash_vision_exp_abliterated_mxfp4_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/split-bench-en.png)
 - [sglang-ladder.py](attachment/2026-09-26_093346_running_deepseek_v4_flash_vision_exp_abliterated_mxfp4_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/sglang-ladder.py)（計測スクリプト）
 - [results.json](attachment/2026-09-26_093346_running_deepseek_v4_flash_vision_exp_abliterated_mxfp4_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/results.json)（参考の実プロンプトの計測）
