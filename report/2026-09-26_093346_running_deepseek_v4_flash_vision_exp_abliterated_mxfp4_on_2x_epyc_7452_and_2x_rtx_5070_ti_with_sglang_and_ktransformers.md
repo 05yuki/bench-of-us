@@ -36,7 +36,7 @@ llama.cpp ではなく sglang＋KTransformers で動かしているため、llam
 
 | 項目 | 内容 |
 |------|------|
-| ツール | 自作スクリプト [`tools/sglang-ladder.py`](https://github.com/05yuki/KTransformers/blob/main/tools/sglang-ladder.py)（llama-split-bench 7af72d4 の `measure_ladder.py` / `measure_pp0.py` と同じ手順を、sglang の `/generate` に移植したもの）。llama-split-bench は llama.cpp 専用のため使っていません |
+| ツール | 自作スクリプト [`sglang-ladder.py`](attachment/2026-09-26_093346_running_deepseek_v4_flash_vision_exp_abliterated_mxfp4_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/sglang-ladder.py)（llama-split-bench 7af72d4 の `measure_ladder.py` / `measure_pp0.py` と同じ手順を、sglang の `/generate` に移植したもの）。llama-split-bench は llama.cpp 専用のため使っていません |
 | モデル | DeepSeek V4-Flash-Vision-Exp の abliterated 版。[huihui-ai/Huihui-DeepSeek-V4-Flash-Vision-Exp-abliterated-GGUF](https://huggingface.co/huihui-ai/Huihui-DeepSeek-V4-Flash-Vision-Exp-abliterated-GGUF) を sglang で読める形式に自前で変換。エキスパートは GGUF の MXFP4 をそのまま使用、エキスパート以外の重みは FP8。147 GB。43 層、ルーティングされるエキスパート 256 個中 6 個がアクティブ |
 | 測定モード | CPU/GPU 分担（TP=2）。GPU に置くもの: エキスパート以外のすべてと、各層で使用頻度の高いエキスパート 10 個。prefill: 一定以上の長さでは、エキスパートを層ごとに GPU へ転送して計算。同時に CPU がエキスパート 3 グループ分を並行して計算 |
 | ctx / stages | 1M（KV キャッシュの確保は 262K トークン） / 0,32000,64000,128000 |
@@ -88,7 +88,7 @@ decode（t/s、2 回の範囲）:
 
 ### 所感
 
-- 深度ラダーでは、最も深い段（129k）まで decode は 31.6〜32.8 t/s、prefill は 560〜569 t/s で、深さによる低下はほとんどありませんでした。
+- 深度ラダーでは、最も深い段（128k）まで decode は 31.6〜32.8 t/s、prefill は 560〜569 t/s で、深さによる低下はほとんどありませんでした。
 - prefill は PCIe の帯域で頭打ちです。これ以上速くするには、転送するエキスパートのバイト数を減らすか、CPU の分担を増やす必要があり、CPU 側のカーネルの高速化を続けています。
 - VRAM 16 GB × 2 枚では 147 GB のモデルの 1 割も GPU に載りませんが、decode は GPU に置いたエキスパートと CPU のメモリ帯域で 40 t/s 台に届きました。
 - GPU 間 P2P のない 2 枚では、NCCL の SHM 経路が decode の all-reduce で重く、ホストメモリ経由の all-reduce に替えるだけで decode が 4〜6% 伸びました。
@@ -115,4 +115,5 @@ decode（t/s、2 回の範囲）:
 - [split-bench-en.png](attachment/2026-09-26_093346_running_deepseek_v4_flash_vision_exp_abliterated_mxfp4_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/split-bench-en.png)
 - [results-ladder.json](attachment/2026-09-26_093346_running_deepseek_v4_flash_vision_exp_abliterated_mxfp4_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/results-ladder.json) / [results-ladder-pp0.json](attachment/2026-09-26_093346_running_deepseek_v4_flash_vision_exp_abliterated_mxfp4_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/results-ladder-pp0.json)
 - [run-info.json](attachment/2026-09-26_093346_running_deepseek_v4_flash_vision_exp_abliterated_mxfp4_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/run-info.json)
+- [sglang-ladder.py](attachment/2026-09-26_093346_running_deepseek_v4_flash_vision_exp_abliterated_mxfp4_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/sglang-ladder.py)（計測スクリプト）
 - [results.json](attachment/2026-09-26_093346_running_deepseek_v4_flash_vision_exp_abliterated_mxfp4_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/results.json)（参考の実プロンプトの計測）
