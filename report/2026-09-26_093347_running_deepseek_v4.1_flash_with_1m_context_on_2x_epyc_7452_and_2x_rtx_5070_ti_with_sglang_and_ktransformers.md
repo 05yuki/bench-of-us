@@ -36,17 +36,41 @@ llama.cpp ではなく sglang＋KTransformers で動かしているため、llam
 
 | 項目 | 内容 |
 |------|------|
-| ツール | 自作スクリプト（sglang の OpenAI 互換 API にリクエストを送り、経過時間と usage から t/s を計算）。llama-split-bench は llama.cpp 専用のため使っていません |
+| ツール | 自作スクリプト [`tools/sglang-ladder.py`](https://github.com/05yuki/KTransformers/blob/main/tools/sglang-ladder.py)（llama-split-bench 7af72d4 の `measure_ladder.py` / `measure_pp0.py` と同じ手順を、sglang の `/generate` に移植したもの）。llama-split-bench は llama.cpp 専用のため使っていません |
 | モデル | [deepseek-ai/DeepSeek-V4.1-Flash](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash)（公式の重み）。本体は FP8（32×32 ブロック）、エキスパートは FP4。engram テーブル込みで 476 GB。40 層、ルーティングされるエキスパート 384 個中 6 個がアクティブ |
 | 測定モード | CPU/GPU 分担（TP=2）。GPU に置くもの: エキスパート以外のすべてと、各層で使用頻度の高いエキスパート 5 個（Marlin カーネル）。prefill: エキスパートを層ごとに GPU へ転送して計算（ホスト側の領域は起動時にピン留めし、ゼロコピーで転送）。engram: NVMe から直接読み出し |
-| ctx / stages | 1M / 深度ラダーなし（約 6K・約 38K トークンのプロンプトの prefill と、短いプロンプトからの 512 トークン生成） |
+| ctx / stages | 1M / 0,32000,64000,128000 |
 | KV キャッシュ | FP8（e4m3） |
 | 投機的デコード | なし |
-| その他 | prefill は実際に使っている日本語の執筆指示（約 38K トークン）とその先頭 11,000 文字（約 6K トークン）を max_tokens 1 で送信し、2 回目の値（1 回目は起動直後のウォームアップを含む）。プロンプトの先頭に毎回異なる文字列を付けてプレフィックスキャッシュを無効化。decode は `ignore_eos`・思考なしで 2 回。temperature 1.0 / top_p 0.95、同時リクエスト 1。測定日 2026-09-26 |
+| その他 | ラダーは llama-split-bench と同じ英語の合成テキストを使い、各段で前の段の文脈の続きを送ります（前の段までの KV はプレフィックスキャッシュで再利用し、増えた分だけを prefill）。各段の直後に greedy・`ignore_eos` で 1000 トークン生成。depth 0 の prefill は新規プロンプト（512 / 2048 / 8192 トークン、先頭に毎回異なる文字列を付けてキャッシュを無効化）で、表と図の depth 0 は 2048 トークンの値です。同時リクエスト 1、測定日 2026-09-28〜29。参考の実プロンプトの計測: prefill は実際に使っている日本語の執筆指示（約 38K トークン）とその先頭 11,000 文字（約 6K トークン）を max_tokens 1 で送信し、2 回目の値（1 回目は起動直後のウォームアップを含む）。プロンプトの先頭に毎回異なる文字列を付けてプレフィックスキャッシュを無効化。decode は `ignore_eos`・思考なしで 2 回。temperature 1.0 / top_p 0.95、同時リクエスト 1。測定日 2026-09-26 |
 
 ### 結果
 
 ![結果](attachment/2026-09-26_093347_running_deepseek_v4.1_flash_with_1m_context_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/split-bench-ja.png)
+
+depth ごとの prefill / decode（t/s）。depth 0 の prefill は新規プロンプト（2048 トークン）の値です。decode はラダーの合成テキストでの実測値です。
+
+| depth | 実際の深さ（トークン） | prefill | decode |
+|------:|------:|------:|------:|
+| 0 | 0 | 242 | 23.5 |
+| 29k | 29,183 | 249 | 23.2 |
+| 64k | 64,926 | 185 | 23.3 |
+| 128k | 128,761 | 211 | 22.9 |
+
+depth 0 の新規プロンプト prefill（t/s）:
+
+| プロンプト長（トークン） | prefill |
+|------:|------:|
+| 493 | 91.0 |
+| 1,887 | 242 |
+| 7,404 | 241 |
+
+- 時間は sglang のサーバ側の記録（prefill の開始・終了時刻、decode のスループット）から計算しています
+- ラダーの計測時だけプレフィックスキャッシュを有効にし、KV キャッシュの確保を 262K トークンに下げています（普段の設定はキャッシュ無効・1M トークン確保。1M 確保のままでは 128K の段の prefill で VRAM が不足しました）
+
+ラダーの decode（英語の合成テキスト、greedy）は、下の実プロンプト（日本語、temperature 1.0）の値より低めです。GPU に置いた高頻度エキスパートは日本語の執筆でのルーティングから選んでいるため、合成テキストでは GPU 側で計算される割合が下がることが主な理由だと考えていますが、確認はしていません。
+
+#### 参考: 実際の執筆指示での計測（2026-09-26）
 
 プロンプト長ごとの prefill（t/s）。括弧内は所要時間です。
 
@@ -66,6 +90,7 @@ decode（t/s、2 回の範囲）:
 
 ### 所感
 
+- 深度ラダーでは、最も深い段（129k）まで decode は 22.9〜23.5 t/s、prefill は 185〜249 t/s で、深さによる低下はほとんどありませんでした。
 - decode は CPU のメモリ帯域どおりの値でした。EPYC 7452 はソケットあたり CCD が 4 つで、メモリ帯域の上限は DIMM ではなく CCD の数で決まっていました。
 - 長い prefill を続けて実行すると徐々に遅くなる現象があり、原因は熱でした。吸気温度が 47℃ を超えると CPU1 側のメモリ帯域が半分ほどに絞られます。CPU1 ソケットの直上にファンを追加して冷やし、安定させています。
 - コンテキスト長 1M を確保できるので、長い思考を伴う用途や、複数の文脈を並行して扱う用途はこのモデルに寄せています。
@@ -89,4 +114,6 @@ decode（t/s、2 回の範囲）:
 ## 添付
 
 - [split-bench-en.png](attachment/2026-09-26_093347_running_deepseek_v4.1_flash_with_1m_context_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/split-bench-en.png)
-- [results.json](attachment/2026-09-26_093347_running_deepseek_v4.1_flash_with_1m_context_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/results.json)
+- [results-ladder.json](attachment/2026-09-26_093347_running_deepseek_v4.1_flash_with_1m_context_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/results-ladder.json) / [results-ladder-pp0.json](attachment/2026-09-26_093347_running_deepseek_v4.1_flash_with_1m_context_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/results-ladder-pp0.json)
+- [run-info.json](attachment/2026-09-26_093347_running_deepseek_v4.1_flash_with_1m_context_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/run-info.json)
+- [results.json](attachment/2026-09-26_093347_running_deepseek_v4.1_flash_with_1m_context_on_2x_epyc_7452_and_2x_rtx_5070_ti_with_sglang_and_ktransformers/results.json)（参考の実プロンプトの計測）
