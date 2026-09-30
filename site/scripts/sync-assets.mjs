@@ -8,7 +8,10 @@ const siteRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const repoRoot = path.resolve(siteRoot, '..');
 const src = path.join(repoRoot, 'report', 'attachment');
 const dest = path.join(siteRoot, 'public', 'report-assets');
-const allowedExtensions = new Set(['.png', '.json', '.txt']);
+// csv / diff も許可する: ベンチの生データ（サンプル列）やパッチ差分をそのまま証跡として
+// 添付するレポートがある（例: report/2026-09-26_171511_..._128gb, report/2026-09-26_203225_..._rtx_5090）。
+// いずれも静的テキストで、サイトからは report-assets/ としてそのまま配信される。
+const allowedExtensions = new Set(['.png', '.json', '.txt', '.csv', '.diff']);
 
 async function exists(p) {
   try {
